@@ -1,0 +1,27 @@
+{
+  "name": "showheaders",
+  "version": "0.0.1",
+  "description": "Simple Node.JS application to show the incomming headers.",
+  "scripts": {
+    "start": "node app.js"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+ssh://git@github.com/duijvelshoff/ShowHeaders.git"
+  },
+  "keywords": [
+    "nodejs",
+    "debug",
+    "http"
+  ],
+  "author": "Nick Duijvelshoff",
+  "license": "MIT",
+  "bugs": {
+    "url": "https://github.com/duijvelshoff/ShowHeaders/issues"
+  },
+  "homepage": "https://github.com/duijvelshoff/ShowHeaders#readme",
+  "dependencies": {
+    "ejs": "^2.5.9",
+    "express": "^4.16.3"
+  }
+}

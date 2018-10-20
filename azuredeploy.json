@@ -1,0 +1,217 @@
+{
+    "parameters": {
+        "siteName": {
+            "type": "string",
+            "metadata": {
+                "description": "The name of the webapp that you wish to create."
+            }
+        },
+        "appServicePlanSKU": {
+            "type": "string",
+            "allowedValues": [
+                "Shared",
+                "Basic",
+                "Standard"
+            ],
+            "defaultValue": "Standard"
+        },
+        "appServicePlanWorkerSize": {
+            "type": "string",
+            "allowedValues": [
+                "0",
+                "1",
+                "2"
+            ],
+            "defaultValue": "0"
+        },
+        "storageAccountType": {
+            "type": "string",
+            "allowedValues": [
+                "Standard_LRS",
+                "Standard_GRS",
+                "Standard_RAGRS",
+                "Standard_L"
+            ],
+            "defaultValue": "Standard_LRS",
+            "metadata": {
+                "description": "Storage Account type"
+            }
+        },
+        "publicDomainName": { 
+            "type": "string",
+            "defaultValue": "domain.tld",
+            "metadata": {
+                "description": "A CNAME record must exist to: {siteName}.azurewebsites.net!"
+            }
+        },
+        "letsencryptPrincipalId": {
+            "type": "string",
+            "minLength": 1,
+            "metadata": {
+                "description": "The principalid/objectid for service principal registered in Azure AD, can e.g. be found with Get-MsolServicePrincipal |? {$_.AppPrincipalId -eq \"<cliendId>\"}"
+            }
+        },
+        "letsencryptEMail" : {
+            "type": "string",
+            "defaultValue": "support@domain.tld"
+        },
+        "letsencryptClientId" : {
+            "type": "string",
+            "minLength": 1
+        },
+        "letsencryptClientSecret" : {
+            "type": "string",
+            "minLength": 1
+        }
+    },
+    "variables": {
+        "appServicePlanName": "[concat(parameters('siteName'), '-plan')]",
+        "storageAccountName": "[concat('storage',uniquestring(resourceGroup().id))]",
+        "Owner": "[concat('/subscriptions/', subscription().subscriptionId, '/providers/Microsoft.Authorization/roleDefinitions/', '8e3af657-a8ff-443c-a75c-2fe8c4bcb635')]"
+    },
+    "resources": [
+        {
+            "apiVersion": "2017-09-01",
+            "type": "Microsoft.Authorization/roleAssignments",
+            "name": "DCE46385-7B6B-4E6B-87ED-F011289008D3",
+            "properties": {
+                "roleDefinitionId": "[variables('Owner')]",
+                "principalId": "[parameters('letsencryptPrincipalId')]",
+                "scope": "[resourceGroup().id]"
+            }
+        },
+        {
+            "name": "[variables('appServicePlanName')]",
+            "type": "Microsoft.Web/serverfarms",
+            "apiVersion": "2014-06-01",
+            "dependsOn": [],
+            "tags": {
+                "displayName": "appServicePlan"
+            },
+            "properties": {
+                "name": "[variables('appServicePlanName')]",
+                "sku": "[parameters('appServicePlanSKU')]",
+                "workerSize": "[parameters('appServicePlanWorkerSize')]",
+                "numberOfWorkers": 1
+            },
+            "location": "[resourceGroup().location]"
+        },
+        {
+            "apiVersion": "2015-06-15",
+            "name": "[variables('storageAccountName')]",
+            "type": "Microsoft.Storage/storageAccounts",
+            "dependsOn": [],
+            "properties": {
+                "accountType": "[parameters('storageAccountType')]"
+            },
+            "location": "[resourceGroup().location]"
+        },
+        {
+            "apiVersion": "2018-02-01",
+            "name": "[parameters('siteName')]",
+            "type": "Microsoft.Web/sites",
+            "dependsOn": [
+                "[concat('Microsoft.Web/serverfarms/', variables('appServicePlanName'))]"
+            ],
+            "properties": {
+                "name": "[parameters('siteName')]",
+                "siteConfig": {
+                    "AlwaysOn": true,
+                    "httpsOnly": true,
+                    "localMySqlEnabled": false,
+                    "appSettings": []
+                },
+                "serverFarmId": "[resourceId('Microsoft.Web/serverfarms/', variables('appServicePlanName'))]"
+            },
+            "resources": [
+                {
+                    "apiVersion": "2018-02-01",
+                    "name": "[parameters('publicDomainName')]",
+                    "type": "hostNameBindings",
+                    "dependsOn": [
+                        "[concat('Microsoft.Web/sites/', parameters('siteName'))]"
+                    ],
+                    "properties": {
+                        "domainId": null,
+                        "hostNameType": "Verified",
+                        "siteName": "parameters('siteName')"
+                    }
+                },
+                {
+                    "apiVersion": "2018-02-01",
+                    "name": "appsettings",
+                    "type": "config",
+                    "dependsOn": [
+                        "[resourceId('Microsoft.Web/sites', parameters('siteName'))]"
+                    ],
+                    "properties": {
+                        "WEBSITE_NODE_DEFAULT_VERSION": "6.9.1",
+                        "SCM_SITEEXTENSIONS_FEED_URL": "https://www.siteextensions.net/api/v2/",
+                        "letsencrypt:Tenant": "[subscription().tenantId]",
+                        "letsencrypt:SubscriptionId": "[subscription().subscriptionId]",           
+                        "letsencrypt:ClientId": "[parameters('letsencryptClientId')]",
+                        "letsencrypt:ClientSecret": "[parameters('letsencryptClientSecret')]",
+                        "letsencrypt:ResourceGroupName": "[resourceGroup().name]",
+                        "letsencrypt:ServicePlanResourceGroupName": "[resourceGroup().name]",
+                        "letsencrypt:AcmeBaseUri": "https://acme-v01.api.letsencrypt.org/",
+                        "letsencrypt:Email": "[parameters('letsencryptEMail')]",      
+                        "letsencrypt:Hostnames": "[parameters('publicDomainName')]",
+                        "letsencrypt:DisableWebConfigUpdate": "false",            
+                        "letsencrypt:UseIPBasedSSL": "false"
+                    }
+                },
+                {
+                    "apiVersion": "2018-02-01",
+                    "type": "config",
+                    "name": "connectionstrings",
+                    "dependsOn": [
+                        "[concat('Microsoft.Web/sites/', parameters('siteName'))]",
+                        "[concat('Microsoft.Storage/storageAccounts/', variables('storageAccountName'))]"
+                    ],
+                    "properties": {
+                        "AzureWebJobsStorage": {
+                            "value": "[concat('DefaultEndpointsProtocol=https;AccountName=',variables('storageAccountName'),';AccountKey=',listKeys(resourceId('Microsoft.Storage/storageAccounts', variables('storageAccountName')),  '2015-06-15').key1,';')]",
+                            "type": 3
+                        },
+                        "AzureWebJobsDashboard": {
+                            "value": "[concat('DefaultEndpointsProtocol=https;AccountName=',variables('storageAccountName'),';AccountKey=',listKeys(resourceId('Microsoft.Storage/storageAccounts', variables('storageAccountName')),  '2015-06-15').key1,';')]",
+                            "type": 3
+                        }
+                    }
+                },
+                {
+                    "apiVersion": "2018-02-01",
+                    "name": "letsencrypt",
+                    "type": "siteextensions",
+                    "dependsOn": [
+                        "[resourceId('Microsoft.Web/Sites', parameters('siteName'))]",
+                        "[resourceId('Microsoft.Web/Sites/config', parameters('siteName'), 'appsettings')]",
+                        "[resourceId('Microsoft.Web/Sites/config', parameters('siteName'), 'connectionstrings')]"
+                    ],
+                    "properties": {
+                        "test": "key1"
+                    }
+                  },
+                  {
+                    "apiVersion": "2018-02-01",
+                    "name": "web",
+                    "type": "sourcecontrols",
+                    "dependsOn": [
+                        "[resourceId('Microsoft.Web/Sites', parameters('siteName'))]",
+                        "[resourceId('Microsoft.Web/Sites/config', parameters('siteName'), 'appsettings')]",
+                        "[resourceId('Microsoft.Web/Sites/config', parameters('siteName'), 'connectionstrings')]",
+                        "[resourceId('Microsoft.Web/Sites/siteextensions', parameters('siteName'), 'letsencrypt')]"
+                    ],
+                    "properties": {
+                        "RepoUrl": "https://github.com/duijvelshoff/ShowHeaders",
+                        "branch": "master",
+                        "IsManualIntegration": "true"
+                    }
+                  }
+            ],
+            "location": "[resourceGroup().location]"
+        }
+    ],
+    "$schema": "http://schema.management.azure.com/schemas/2014-04-01-preview/deploymentTemplate.json#",
+    "contentVersion": "1.0.0.0"
+}

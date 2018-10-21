@@ -67,7 +67,7 @@
     "variables": {
         "appServicePlanName": "[concat(parameters('siteName'), '-plan')]",
         "storageAccountName": "[concat('storage',uniquestring(resourceGroup().id))]",
-        "Owner": "[concat('/subscriptions/', subscription().subscriptionId, '/providers/Microsoft.Authorization/roleDefinitions/', '8e3af657-a8ff-443c-a75c-2fe8c4bcb635')]"
+        "Contributor": "[concat('/subscriptions/', subscription().subscriptionId, '/providers/Microsoft.Authorization/roleDefinitions/', 'b24988ac-6180-42a0-ab88-20f7382dd24c')]"
     },
     "resources": [
         {
@@ -75,7 +75,7 @@
             "type": "Microsoft.Authorization/roleAssignments",
             "name": "DCE46385-7B6B-4E6B-87ED-F011289008D3",
             "properties": {
-                "roleDefinitionId": "[variables('Owner')]",
+                "roleDefinitionId": "[variables('Contributor')]",
                 "principalId": "[parameters('letsencryptPrincipalId')]",
                 "scope": "[resourceGroup().id]"
             }
